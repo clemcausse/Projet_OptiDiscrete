@@ -11,7 +11,6 @@ set_optimizer(model, CPLEX.Optimizer)
 
 #set_optimizer_attribute(model, "CPLEX.log_level", 1)
 set_optimizer_attribute(model, "CPX_PARAM_FEASOPTMODE", 1)
-set_optimizer_attribute(model, "CPX_PARAM_TILIM", 60)  
 set_optimizer_attribute(model, "CPX_PARAM_CONFLICTDISPLAY", 2) 
 set_optimizer_attribute(model, "CPX_PARAM_WRITELEVEL", 2)  
 set_optimizer_attribute(model, "CPX_PARAM_WORKDIR", "./logs")

@@ -1,11 +1,9 @@
 #=
-Construction du model : tentative de debug
+Construction du model : tentatives de debug
 
 /!\ Uniquement pour les centrales thermiques pour le moment
 
-Sans S : Integer Infeasible
-Sans S + sans RampUp et sans RampDown : Solution ok 
-
+Integer infeasible si RampUp et Min arrêt sont présent en même à t=0
 =#
 
 using JuMP, Serialization
@@ -38,7 +36,7 @@ model = Model()
 #Création des variables
 @variable(model,P[1:nbUnit,1:T] >= 0)   #Puissance produite par centrale i au temps t
 @variable(model,U[1:nbUnit,1:T],Bin)    #Centrale i allumé (1) ou non (0) au temps t
-
+@variable(model,S[1:nbUnit,1:T],Bin)    #Allumage de la centrale i au temps t (1)
 
 #Définitions des contraintes
 
@@ -53,13 +51,15 @@ for i in 1:nbUnit
     @constraint(model, (P[i,1] - InitPower[i]) <= DeltaRampUp[i])
     @constraint(model, (InitPower[i]- P[i,1]) <= DeltaRampDown[i])
 
+    #Contrainte sur S au temps initial
+    @constraint(model, S[i,1] >= -U[i,1]*InitialUpDownTime[i]/abs(InitialUpDownTime[i]))
 
     #Temps min d'allumage et d'arrêt au temps initial 
     IUDT = InitialUpDownTime[i]
     tau_plus = MinUpTime[i]
     tau_minus = MinDownTime[i]
 
-
+    #=
     if IUDT > 0 && tau_plus != IUDT
         @constraint(model, U[i,1] >= (tau_plus - IUDT)/abs(tau_plus - IUDT))
     elseif IUDT <= 0 && tau_minus != -IUDT
@@ -68,15 +68,33 @@ for i in 1:nbUnit
         @constraint(model, U[i,1] >= 0)
     elseif IUDT <= 0 && tau_minus == -IUDT
         @constraint(model, U[i,1] <= 1)
-    end
+    end=#
+
+    # Uniquement contrainte de min d'allumage au temps initial 
+    if IUDT > 0 && tau_plus != IUDT
+        @constraint(model, U[i,1] >= (tau_plus - IUDT)/abs(tau_plus - IUDT))
+    elseif IUDT > 0 && tau_plus == IUDT
+        @constraint(model, U[i,1] >= 0)
+    end 
+
+
+    #Uniquement contrainte de min d'arret au temps initial
+    if IUDT <= 0 && tau_minus != -IUDT
+        @constraint(model, U[i,1] <= (1-((tau_minus + IUDT)/abs(tau_minus + IUDT))))
+    elseif IUDT <= 0 && tau_minus == -IUDT
+        @constraint(model, U[i,1] <= 1)
+    end 
 
     for t in 2:T
         #Gradient de puissance pour tout t > 1
         @constraint(model,(P[i,t-1]-P[i,t]) <= (DeltaRampDown[i]*(1+U[i,t]-U[i,t-1]) - 0.5*Pmax[i]*(U[i,t]-U[i,t-1]))*(1-U[i,t]+U[i,t-1]))
         @constraint(model,(P[i,t]-P[i,t-1]) <= (DeltaRampUp[i]*(1-U[i,t]+U[i,t-1]) + 0.5*Pmin[i]*(U[i,t]-U[i,t-1]))*(1+U[i,t]-U[i,t-1]))
 
+        #S pour tout t>1
+        @constraint(model, S[i,t] >= (U[i,t]-U[i,t-1]))
 
         #Temps min d'allumage et d'arrêt
+        
         if t <= tau_plus
             if IUDT > 0
                 @constraint(model, sum(U[i,1:t-1])+IUDT >= tau_plus*(U[i,t-1]-U[i,t]))
@@ -85,8 +103,9 @@ for i in 1:nbUnit
             end
         else
             @constraint(model, sum(U[i,1+t-tau_plus:t-1]) >= tau_plus*(U[i,t-1]-U[i,t]))
-        end
-
+        end 
+        
+        
         if t <= tau_minus
             if IUDT > 0
                 @constraint(model,sum(1 .- U[i,1:t-1]) >= tau_minus*(U[i,t]-U[i,t-1]))
@@ -95,7 +114,8 @@ for i in 1:nbUnit
             end
         else
             @constraint(model, sum(1 .- U[i,1+t-tau_minus:t-1]) >= tau_minus*(U[i,t]-U[i,t-1]))
-        end
+        end 
+        
     end 
   
 end
@@ -106,8 +126,7 @@ for t in 1:T
 end
 
 #Fonction coût
-@objective(model,Min,sum(P.*RunningCost))
-
+@objective(model,Min,sum(P.*RunningCost + S.*StartUpCost))
 
 
 println("Model complete : Writting to file")
