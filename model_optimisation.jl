@@ -4,38 +4,44 @@ Optimisation du modèle
 /!\ Uniquement pour les centrales thermiques pour le moment
 =#
 
-using JuMP, CPLEX
+using JuMP, CPLEX, Serialization
+
 
 model = read_from_file("model_problem_debug.mps")
 set_optimizer(model, CPLEX.Optimizer)
-
-#set_optimizer_attribute(model, "CPLEX.log_level", 1)
-set_optimizer_attribute(model, "CPX_PARAM_FEASOPTMODE", 1)
-set_optimizer_attribute(model, "CPX_PARAM_CONFLICTDISPLAY", 2) 
-set_optimizer_attribute(model, "CPX_PARAM_WRITELEVEL", 2)  
-set_optimizer_attribute(model, "CPX_PARAM_WORKDIR", "./logs")
-set_optimizer_attribute(model, "CPX_PARAM_MIPDISPLAY", 4) 
-
-
 #show(model)
 
 optimize!(model)
 
-display(solution_summary(model))
-#println(objective_value(model))
+if is_solved_and_feasible(model)
+    data = deserialize("model_data.dat")
+    T = data[1]
+    nbUnit = data[2]
 
-#MOI.submit(model, MOI.ConflictRefiner())
+    P_values = zeros(nbUnit,T)
+    U_values = zeros(nbUnit,T)
+    S_values = zeros(nbUnit,T)
 
-#compute_conflict!(model)
-#println(MOI.ConflictStatusCode(model))
+    println("Collecting Data from the optimiser")
+    k = 0
+    for var in all_variables(model)
+        if k < nbUnit*T
+            P_values[k%nbUnit + 1,floor(Int, k/nbUnit)+1] = value(var)
+        end
 
-#=
-P = value(P)
-U = value(U)
-S = value(S)
+        if k < 2*nbUnit*T && k >= nbUnit*T
+            temp_kU = k - nbUnit*T
+            U_values[temp_kU%nbUnit + 1,floor(Int, temp_kU/nbUnit)+1] = value(var)
+        end
 
-final_cost = objective_value(model)
+        if k >= 2*nbUnit*T
+            temp_kS = k - 2*nbUnit*T
+            S_values[temp_kS%nbUnit + 1,floor(Int, temp_kS/nbUnit)+1] = value(var)
+        end
 
-println("Cout final : ",final_cost)
-println("Puissance centrale 1 (t de 1 à 5)", P[1,1:5])
-=#
+        global k += 1
+    end
+    serialize("result_optimiser.dat",(P_values,U_values,S_values))
+else
+    display(solution_summary(model))
+end
