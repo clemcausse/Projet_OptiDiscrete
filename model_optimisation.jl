@@ -7,7 +7,7 @@ Optimisation du modèle
 using JuMP, CPLEX, Serialization
 
 
-model = read_from_file("model_problem_debug.mps")
+model = read_from_file("model_problem.mps")
 set_optimizer(model, CPLEX.Optimizer)
 #show(model)
 
