@@ -42,6 +42,7 @@ if is_solved_and_feasible(model)
         global k += 1
     end
     serialize("result_optimiser.dat",(P_values,U_values,S_values))
+    println("Data collected and moved to .dat file")
 else
     display(solution_summary(model))
 end
