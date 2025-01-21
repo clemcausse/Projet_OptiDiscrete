@@ -6,14 +6,13 @@ Collection des données du problèmes
 
 using NCDatasets, Serialization
 
-#myds = NCDataset("Data/20090907_extended_pHydro_18_none.nc4")
-myds = NCDataset("Data/100_0_2_w.nc4")
+myds = NCDataset("Data/20090907_extended_pHydro_18_none.nc4")
+#myds = NCDataset("Data/100_0_1_w.nc4")
 #myds = NCDataset("Data/Aurland_1000.nc4")
 
 #Données générales du problèmes
 blk0 = myds.group["Block_0"]
 
-nbUnit = blk0.dim["NumberUnits"]
 T = blk0.dim["TimeHorizon"]
 Demand = blk0["ActivePowerDemand"] |> Array
 
@@ -34,27 +33,27 @@ end
 println("The list of found Thermal units is as follows:")
 println( ThUnits )
 
+#Données relatives à chaque centrales thermiques
 
-#RDonnées relatives à chaque centrales thermiques
-
-Pmin = []
-Pmax = []
-DeltaRampUp = []
-DeltaRampDown = []
+PminTh = []
+PmaxTh = []
+DeltaRampUpTh = []
+DeltaRampDownTh = []
 InitialUpDownTime = []
 MinUpTime = []
 MinDownTime = []
 RunningCost = []
 InitPower = []
 StartUpCost = []
+nbUnitTh = 0
 
 for ky in ThUnits
     println("Handling : ", ky)
 
-    push!(Pmin,blk0.group[ky]["MinPower"][])
-    push!(Pmax,blk0.group[ky]["MaxPower"][])
-    push!(DeltaRampUp,blk0.group[ky]["DeltaRampUp"][])
-    push!(DeltaRampDown,blk0.group[ky]["DeltaRampDown"][])
+    push!(PminTh,blk0.group[ky]["MinPower"][])
+    push!(PmaxTh,blk0.group[ky]["MaxPower"][])
+    push!(DeltaRampUpTh,blk0.group[ky]["DeltaRampUp"][])
+    push!(DeltaRampDownTh,blk0.group[ky]["DeltaRampDown"][])
     IUDT = blk0.group[ky]["InitUpDownTime"][]
     push!(InitialUpDownTime,IUDT)
     push!(MinUpTime,blk0.group[ky]["MinUpTime"][])
@@ -66,11 +65,103 @@ for ky in ThUnits
     end
     push!(InitPower,initP)
     push!(StartUpCost, blk0.group[ky]["StartUpCost"][])
+
+    global nbUnitTh += 1
 end
 
 
+#List of Hydro Units
+println("The list of found Hydro units is as follows:")
+println( HyUnits )
+
+#Données relatives à chaque centrales thermiques
+
+NumberReservoirs = []
+NumberArcs = []
+TotalNumberPieces = []
+
+StartArcs = []
+EndArcs = []
+
+Inflows = []
+InitialVolumetric = []
+MinVolumetric = []
+MaxVolumetric = []
+
+InitialFlowRate = []
+DeltaRampUpHy = []
+DeltaRampDownHy = []
+MinFlow = []
+MaxFlow = []
+
+PminHy = []
+PmaxHy = []
+NumberPieces = []
+LinearTerm = []
+ConstantTerm = []
+
+nbUnitHy = 0
+
+for ky in HyUnits
+    println("Handling : ", ky)
+
+    push!(NumberReservoirs,blk0.group[ky].dim["NumberReservoirs"])
+    nbArcs = blk0.group[ky].dim["NumberArcs"]
+    push!(NumberArcs,nbArcs)
+    push!(TotalNumberPieces,blk0.group[ky].dim["TotalNumberPieces"])
+    
+    push!(StartArcs,blk0.group[ky]["StartArc"] |> Array)
+    push!(EndArcs,blk0.group[ky]["EndArc"]|> Array)
+
+    push!(Inflows,blk0.group[ky]["Inflows"]|> Array)
+    push!(InitialVolumetric,blk0.group[ky]["InitialVolumetric"]|> Array)
+    push!(MinVolumetric,blk0.group[ky]["MinVolumetric"]|> Array)
+    push!(MaxVolumetric,blk0.group[ky]["MaxVolumetric"]|> Array)
+
+    push!(InitialFlowRate,blk0.group[ky]["InitialFlowRate"]|> Array)
+    push!(DeltaRampUpHy,blk0.group[ky]["DeltaRampUp"]|> Array)
+    push!(DeltaRampDownHy,blk0.group[ky]["DeltaRampDown"]|> Array)
+    push!(MinFlow,blk0.group[ky]["MinFlow"]|> Array)
+    push!(MaxFlow,blk0.group[ky]["MaxFlow"]|> Array)
+
+    push!(PminHy,blk0.group[ky]["MinPower"]|> Array)
+    push!(PmaxHy,blk0.group[ky]["MaxPower"]|> Array)
+    nbPieces = blk0.group[ky]["NumberPieces"]|> Array
+    push!(NumberPieces,nbPieces)
+
+    LT = blk0.group[ky]["LinearTerm"]|> Array
+    CT = blk0.group[ky]["ConstantTerm"]|> Array
+
+    LinTerms = []
+    ConTerms = []
+    push!(LinTerms,LT[1:nbPieces[1]])
+    push!(ConTerms,CT[1:nbPieces[1]])
+
+    for i in 2:nbArcs
+        s = sum(nbPieces[1:i-1])
+        l = nbPieces[i]
+
+        push!(LinTerms,LT[s+1:s+l])
+        push!(ConTerms,CT[s+1:s+l])
+    end
+
+    push!(LinearTerm,LinTerms)
+    push!(ConstantTerm,ConTerms)
+
+    global nbUnitHy +=1
+end
+
+nbUnit = nbUnitTh + nbUnitHy
+
 #Sauvegarde des données du problèmes en vu de la construction du problème
-serialize("model_data.dat",(T,nbUnit,Demand,Pmin,Pmax,DeltaRampUp,DeltaRampDown,InitialUpDownTime,InitPower,RunningCost,MinUpTime,MinDownTime,StartUpCost))
+serialize("model_data_Global.dat",(T,nbUnit,Demand))
+
+serialize("model_data_Th.dat",(nbUnitTh,PminTh,PmaxTh,DeltaRampUpTh,DeltaRampDownTh,InitialUpDownTime,InitPower,
+    RunningCost,MinUpTime,MinDownTime,StartUpCost))
+
+serialize("model_data_Hy.dat",(nbUnitHy,NumberReservoirs,NumberArcs,TotalNumberPieces,StartArcs,EndArcs,Inflows,
+    InitialVolumetric,MinVolumetric,MaxVolumetric,InitialFlowRate,DeltaRampUpHy,DeltaRampDownHy,MinFlow,MaxFlow,
+    PminHy,PmaxHy,NumberPieces,LinearTerm,ConstantTerm))
 
 close(myds)
 
