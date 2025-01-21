@@ -1,33 +1,36 @@
 #=
-Construction du model : tentatives de debug
+Construction du model
 
 /!\ Uniquement pour les centrales thermiques pour le moment
 
-Integer infeasible si RampUp et Min arrêt sont présent en même à t=0
+Integer infeasible si condition sur le gradient et Min arrêt sont présent en même à t=0
 =#
 
 using JuMP, Serialization
 
 
 #Recupération des données du problèmes
-data = deserialize("model_data.dat")
+global_data = deserialize("model_data_Global.dat")
+data = deserialize("model_data_Th.dat")
 #=
-Ordre dans serialization :
-T,nbUnit,Demand,Pmin,Pmax,DeltaRampUp,DeltaRampDown,InitialUpDownTime,InitPower,Cost,MinUpTime,MinDownTime,StartUpCost
+Ordre dans serialization data_Th :
+nbUnitTh,PminTh,PmaxTh,DeltaRampUpTh,DeltaRampDownTh,InitialUpDownTime,
+InitPower,RunningCost,MinUpTime,MinDownTime,StartUpCost
 =#
-T = data[1]
-nbUnit = data[2]
-Demand = data[3]
-Pmin = data[4]
-Pmax = data[5]
-DeltaRampUp = data[6]
-DeltaRampDown = data[7]
-InitialUpDownTime = data[8]
-InitPower = data[9]
-RunningCost = data[10]
-MinUpTime = data[11]
-MinDownTime =  data[12]
-StartUpCost = data[13]
+T = global_data[1]
+Demand = global_data[3]
+
+nbUnit = data[1]
+Pmin = data[2]
+Pmax = data[3]
+DeltaRampUp = data[4]
+DeltaRampDown = data[5]
+InitialUpDownTime = data[6]
+InitPower = data[7]
+RunningCost = data[8]
+MinUpTime = data[9]
+MinDownTime =  data[10]
+StartUpCost = data[11]
 
 
 
